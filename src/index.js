@@ -75,9 +75,11 @@ function handler(event, context) {
     async.waterfall(shoutitWaterfall,
         function (err) {
             if (err) {
-                context.done('Unable to create thumbnails for ' + srcBucket + '/' + srcKey + ' due to an error: ' + err);
+                console.log('Unable to create thumbnails for ' + srcBucket + '/' + srcKey);
+                context.done(err);
             } else {
-                context.done(null, 'Successfully created thumbnails for ' + srcBucket + '/' + srcKey);
+                console.log('Successfully created thumbnails for ' + srcBucket + '/' + srcKey);
+                context.done(null);
             }
         }
     );

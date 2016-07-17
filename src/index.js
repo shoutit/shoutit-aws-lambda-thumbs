@@ -69,7 +69,7 @@ function handler(event, context) {
             dstKey = srcBaseName + "_" + key + srcExtName;
         shoutitWaterfall.push(genTransform(srcExtName, variation[0], variation[1], variation[2]));
         shoutitWaterfall.push(genCompress(srcExtName));
-        shoutitWaterfall.push(genUpload(dstBucket, dstKey));
+        shoutitWaterfall.push(genUpload(dstBucket, dstKey, srcExtName));
     });
 
     async.waterfall(shoutitWaterfall,
@@ -81,7 +81,7 @@ function handler(event, context) {
             }
         }
     );
-};
+}
 
 
 function genTransform(extName, maxWidth, maxHeight, waterMark) {
@@ -147,7 +147,7 @@ function genCompress(extName) {
 }
 
 
-function genUpload(dstBucket, dstKey) {
+function genUpload(dstBucket, dstKey, srcExtName) {
     return function upload(data, response, next) {
         // Stream the transformed image to a different S3 bucket.
         console.log('Uploading, dstBucket: ' + dstBucket + ' dstKey: ' + dstKey);
@@ -156,7 +156,7 @@ function genUpload(dstBucket, dstKey) {
                 Bucket: dstBucket,
                 Key: dstKey,
                 Body: data,
-                ContentType: response.ContentType,
+                ContentType: 'image/' + srcExtName.slice(1),
                 CacheControl: 'max-age=31536000'
             },
             function (err) {

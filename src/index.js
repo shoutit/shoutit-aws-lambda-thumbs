@@ -4,25 +4,21 @@
  * Time: 18:10
  */
 
-// dependencies
 var async = require('async'),
     AWS = require('aws-sdk'),
     gm = require('gm').subClass({imageMagick: true}), // Enable ImageMagick integration.
     util = require('util'),
     path = require('path'),
-    Imagemin = require('imagemin');
+    Imagemin = require('imagemin'),
+    s3 = new AWS.S3(),
+    VARIATIONS = {
+        large: [720, 720, true],
+        medium: [480, 480, false],
+        small: [240, 240, false]
+    };
 
-// constants
-var VARIATIONS = {
-    large: [720, 720],
-    medium: [480, 480],
-    small: [240, 240]
-};
 
-// get reference to S3 client
-var s3 = new AWS.S3();
-
-exports.handler = function (event, context) {
+function handler(event, context) {
     "use strict";
     // Read options from the event.
     console.log("Reading options from event:\n", util.inspect(event, {depth: 5}));
@@ -71,7 +67,7 @@ exports.handler = function (event, context) {
     Object.keys(VARIATIONS).forEach(function (key) {
         var variation = VARIATIONS[key],
             dstKey = srcBaseName + "_" + key + srcExtName;
-        shoutitWaterfall.push(genTransform(srcExtName, variation[0], variation[1]));
+        shoutitWaterfall.push(genTransform(srcExtName, variation[0], variation[1], variation[2]));
         shoutitWaterfall.push(genCompress(srcExtName));
         shoutitWaterfall.push(genUpload(dstBucket, dstKey));
     });
@@ -87,7 +83,8 @@ exports.handler = function (event, context) {
     );
 };
 
-function genTransform(extName, maxWidth, maxHeight) {
+
+function genTransform(extName, maxWidth, maxHeight, waterMark) {
     return function transform(response, next) {
         console.log('Transforming, maxWidth: ' + maxWidth + ' maxHeight: ' + maxHeight);
         gm(response.Body).size(function (err, size) {
@@ -102,17 +99,28 @@ function genTransform(extName, maxWidth, maxHeight) {
                 posY = (height - 44) / 2;
 
             // Transform the image buffer in memory.
-            this.resize(width, height).draw(['image Over ' + posX + ',' + posY + ' 0,0 shoutit.png'])
-                .toBuffer(extName.slice(1), function (err, buffer) {
+            if (waterMark) {
+                this.resize(width, height).draw(['image Over ' + posX + ',' + posY + ' 0,0 shoutitwm.png'])
+                    .toBuffer(extName.slice(1), function (err, buffer) {
+                        if (err) {
+                            next(err);
+                        } else {
+                            next(null, buffer, response);
+                        }
+                    });
+            } else {
+                this.resize(width, height).toBuffer(extName.slice(1), function (err, buffer) {
                     if (err) {
                         next(err);
                     } else {
                         next(null, buffer, response);
                     }
                 });
+            }
         });
     };
 }
+
 
 function genCompress(extName) {
     return function compress(buffer, response, next) {
@@ -138,6 +146,7 @@ function genCompress(extName) {
     };
 }
 
+
 function genUpload(dstBucket, dstKey) {
     return function upload(data, response, next) {
         // Stream the transformed image to a different S3 bucket.
@@ -160,3 +169,12 @@ function genUpload(dstBucket, dstKey) {
         );
     };
 }
+
+
+module.exports = {
+    handler: handler,
+    s3: s3,
+    genTransform: genTransform,
+    genCompress: genCompress,
+    genUpload: genUpload
+};

@@ -18,7 +18,7 @@ var async = require('async'),
     };
 
 
-function handler(event, context) {
+function handler(event, context, callback) {
     "use strict";
     // Read options from the event.
     console.log("Reading options from event:\n", util.inspect(event, {depth: 5}));
@@ -75,11 +75,11 @@ function handler(event, context) {
     async.waterfall(shoutitWaterfall,
         function (err) {
             if (err) {
-                console.log('Unable to create thumbnails for ' + srcBucket + '/' + srcKey);
-                context.done(err);
+                console.error('Unable to create thumbnails for ' + srcBucket + '/' + srcKey)
+                callback(err);
             } else {
-                console.log('Successfully created thumbnails for ' + srcBucket + '/' + srcKey);
-                context.done(null);
+                console.info('Successfully created thumbnails for ' + srcBucket + '/' + srcKey)
+                callback(null);
             }
         }
     );
